@@ -9,7 +9,7 @@
 //! - SVD++
 //! - TimeSVD++
 
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 
 use sprs::CsVec;
 
@@ -32,7 +32,7 @@ pub struct KnnUserRecommender {
     item_ids: Vec<String>,
     ratings: HashMap<usize, CsVec<f64>>,
     similarity: Similarity,
-    n_neighbors: usize
+    n_neighbors: usize,
 }
 
 impl KnnUserRecommender {
@@ -42,7 +42,7 @@ impl KnnUserRecommender {
         let mut item_indices = HashMap::<String, usize>::new();
         let mut user_ids = Vec::new();
         let mut item_ids = Vec::new();
-        let mut pre_vectors = HashMap::<usize, (BTreeMap<usize, f64>)>::new();
+        let mut pre_vectors = HashMap::<usize, BTreeMap<usize, f64>>::new();
         let (mut i, mut j) = (0, 0);
 
         for record in records {
@@ -68,17 +68,17 @@ impl KnnUserRecommender {
             if pre_vectors.contains_key(&user_index) {
                 let pre_vector = pre_vectors.get_mut(&user_index).unwrap();
                 pre_vector.insert(item_index, rating);
-            }
-            else {
+            } else {
                 let mut pre_vector = BTreeMap::new();
                 pre_vector.insert(item_index, rating);
                 pre_vectors.insert(user_index, pre_vector);
             }
         }
 
-        let ratings = pre_vectors.into_iter()
+        let ratings = pre_vectors
+            .into_iter()
             .map(|(k, ind_dat)| {
-                let (ind, dat):(Vec<usize>, Vec<f64>) = ind_dat.into_iter().unzip();
+                let (ind, dat): (Vec<usize>, Vec<f64>) = ind_dat.into_iter().unzip();
                 (k, CsVec::new(item_indices.len(), ind, dat))
             })
             .collect();
@@ -89,7 +89,7 @@ impl KnnUserRecommender {
             item_ids: item_ids,
             ratings: ratings,
             similarity: similarity,
-            n_neighbors: n_neighbors
+            n_neighbors: n_neighbors,
         }
     }
 }
@@ -98,45 +98,51 @@ impl Recommender for KnnUserRecommender {
     /// Returns error if the user or item ids could not be found
     /// or if there is no users with a positive similarity.
     fn predict(&self, user_id: &str, item_id: &str) -> Result<f64, String> {
-        let user_index = try!(self.user_indices.get(user_id).ok_or("User not found"));
-        let item_index = try!(self.item_indices.get(item_id).ok_or("Item not found"));
+        let user_index = self.user_indices.get(user_id).ok_or("User not found")?;
+        let item_index = self.item_indices.get(item_id).ok_or("Item not found")?;
 
         let vector = self.ratings.get(user_index).unwrap();
 
-        let mut ratings = self.ratings.iter().filter_map(|(other_index, other)| {
-            if let Some(&rating) = other.get(*item_index) {
-                if other_index != user_index {
-                    Some((rating, (self.similarity)(vector, other)))
+        let mut ratings = self
+            .ratings
+            .iter()
+            .filter_map(|(other_index, other)| {
+                if let Some(&rating) = other.get(*item_index) {
+                    if other_index != user_index {
+                        Some((rating, (self.similarity)(vector, other)))
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
-            } else {
-                None
-            }
-        }).collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
 
         ratings.sort_by(|&(_, x), &(_, y)| y.partial_cmp(&x).unwrap());
         ratings.truncate(self.n_neighbors);
 
-        let (rating, norm) = ratings.into_iter()
+        let (rating, norm) = ratings
+            .into_iter()
             .fold((0.0, 0.0), |(r_acc, s_acc), (r, s)| {
-                (r*s + r_acc, s + s_acc)
+                (r * s + r_acc, s + s_acc)
             });
 
         if norm > 0.0 {
             Ok(rating / norm)
-        }
-        else {
+        } else {
             Err("No neighbors".to_string())
         }
     }
     fn recommend(&self, user_id: &str) -> Vec<(String, f64)> {
-        let mut recommendations = self.item_ids.iter().filter_map(|item_id| {
-            match self.predict(user_id, item_id) {
+        let mut recommendations = self
+            .item_ids
+            .iter()
+            .filter_map(|item_id| match self.predict(user_id, item_id) {
                 Ok(rating) => Some((item_id.clone(), rating)),
-                Err(_) => None
-            }
-        }).collect::<Vec<(String, f64)>>();
+                Err(_) => None,
+            })
+            .collect::<Vec<(String, f64)>>();
         recommendations.sort_by(|&(_, x), &(_, y)| y.partial_cmp(&x).unwrap());
         recommendations
     }

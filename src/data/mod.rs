@@ -16,7 +16,6 @@
 //! ```
 use csv;
 
-
 /// Type for a record, it is a tuple of two `Strings` and a `f64`
 ///
 /// It represents a record of a dataset consisting of:
@@ -31,14 +30,14 @@ pub enum Field {
     UserID,
     ItemID,
     Rating,
-    Other
+    Other,
 }
 
 /// Options when reading a csv file
 pub struct ReadOptions {
     fields: Vec<Field>,
     has_headers: bool,
-    delimiter: char
+    delimiter: char,
 }
 
 impl ReadOptions {
@@ -48,7 +47,7 @@ impl ReadOptions {
         Self {
             fields: vec![Field::UserID, Field::ItemID, Field::Rating],
             has_headers: false,
-            delimiter: ','
+            delimiter: ',',
         }
     }
 
@@ -78,7 +77,7 @@ impl ReadOptions {
         Self {
             fields: fields,
             has_headers: has_headers,
-            delimiter: delimiter
+            delimiter: delimiter,
         }
     }
 }
@@ -113,25 +112,33 @@ pub fn read_custom_records(path: &str, options: ReadOptions) -> Result<Vec<Recor
             Field::UserID => user_index = i,
             Field::ItemID => item_index = i,
             Field::Rating => rating_index = i,
-            Field::Other => ()
+            Field::Other => (),
         }
     }
 
-    if [user_index, item_index, rating_index].iter().any(|&x| x == n_fields) {
+    if [user_index, item_index, rating_index]
+        .iter()
+        .any(|&x| x == n_fields)
+    {
         return Err(ReadError::Other("Unconsistent field format"));
     }
 
     let del = options.delimiter as u8;
 
-    let mut reader = try!(csv::Reader::from_file(path))
+    let mut reader = csv::Reader::from_file(path)?
         .has_headers(options.has_headers)
         .delimiter(del);
-    let ratings = reader.decode().map(|row| {
-        let row: Vec<String> = row.unwrap();
-        (row[user_index].clone(),
-         row[item_index].clone(),
-         row[rating_index].parse::<f64>().unwrap())
-    }).collect::<Vec<(String, String, f64)>>();
+    let ratings = reader
+        .decode()
+        .map(|row| {
+            let row: Vec<String> = row.unwrap();
+            (
+                row[user_index].clone(),
+                row[item_index].clone(),
+                row[rating_index].parse::<f64>().unwrap(),
+            )
+        })
+        .collect::<Vec<(String, String, f64)>>();
 
     Ok(ratings)
 }
