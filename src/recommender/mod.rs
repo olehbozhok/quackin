@@ -11,7 +11,7 @@
 
 use std::collections::{HashMap, BTreeMap};
 
-use sprs::CsVecOwned;
+use sprs::CsVec;
 
 use super::data::Record;
 use super::metrics::similarity::Similarity;
@@ -30,7 +30,7 @@ pub struct KnnUserRecommender {
     item_indices: HashMap<String, usize>,
     user_ids: Vec<String>,
     item_ids: Vec<String>,
-    ratings: HashMap<usize, CsVecOwned<f64>>,
+    ratings: HashMap<usize, CsVec<f64>>,
     similarity: Similarity,
     n_neighbors: usize
 }
@@ -79,7 +79,7 @@ impl KnnUserRecommender {
         let ratings = pre_vectors.into_iter()
             .map(|(k, ind_dat)| {
                 let (ind, dat):(Vec<usize>, Vec<f64>) = ind_dat.into_iter().unzip();
-                (k, CsVecOwned::new(item_indices.len(), ind, dat))
+                (k, CsVec::new(item_indices.len(), ind, dat))
             })
             .collect();
         Self {
